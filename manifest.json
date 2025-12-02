@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "jx-sydr-plugin",
+  "version": "0.0.1",
+  "description": "Chrome 插件",
+  "icons": {
+    "16": "icons/favicon.png",
+    "19": "icons/favicon.png",
+    "38": "icons/favicon.png",
+    "48": "icons/favicon.png",
+    "128": "icons/favicon.png"
+},
+  "action": {
+    "default_title": "jx-sydr-plugin",
+    "default_icon": "icons/favicon.png",
+    "default_popup": "popup/index.html"
+  },
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "alarms",
+    "storage"
+  ],
+  "host_permissions": [],
+  "content_scripts": [
+    { "type": "module",
+      "js": [
+        "content/content.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ],
+      "all_frames": false,
+      "run_at": "document_end",
+      "match_about_blank": true
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["popup/*", "contentPage/*","contentPageUserInfo/*", "assets/*", "js/*"],
+      "matches": ["<all_urls>"],
+      "use_dynamic_url": true
+    }
+  ]
+}
