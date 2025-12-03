@@ -12,6 +12,7 @@ let ifZetTaoLogin = false;
 let ifZenTaoBug = false;
 let ifZenTaoSearch = false;
 let ifHuaWeiLogin=false;
+let ifJenkinsLogin=false;
 let ifDasLogin=false;
 let env = "";
 let project = "";
@@ -23,22 +24,29 @@ export const auto_write =async (message, sender, sendResponse) :Promise<boolean>
     const currentURL = window.location.href;
     if (currentURL.includes(tapdPath)) {
       ifgetchData = true;
-    } else if (currentURL.includes(zentaoLoginPath)) {
+    } 
+    else if (currentURL.includes(zentaoLoginPath)) {
       ifZetTaoLogin = true;
-    } else if (currentURL.includes(zentaoBugPath)) {
+    } 
+    else if (currentURL.includes(zentaoBugPath)) {
       ifZenTaoBug = true;
-    } else if (currentURL.includes(zentaoSearchPath)) {
+    } 
+    else if (currentURL.includes(zentaoSearchPath)) {
       ifZenTaoSearch = true;
-    }else if (currentURL.includes(huaweiLoginPath)){
+    }
+    else if (currentURL.includes(huaweiLoginPath)){
       let span=await waitForElementToDisplay("div[id='loginForm'][class=''] >div[class='loginTypeDiv'] > span");
 
       if(span && span.textContent=="IAM用户登录"){
 
              ifHuaWeiLogin=true;
-
       }
 
-    }else if (currentURL.includes(dasLoginPath)){
+    }
+    else if (currentURL.includes(jenkinsLoginPath)){
+      ifJenkinsLogin=true;
+    }
+    else if (currentURL.includes(dasLoginPath)){
 
       ifDasLogin=true;
     }
@@ -47,6 +55,7 @@ export const auto_write =async (message, sender, sendResponse) :Promise<boolean>
     }
     // alert("获取完成！"+cssSelector)
   }
+
   else if (message.action === MyAction.endwriteInfo) {
     chrome.storage.sync.remove(message.target)
     removeIframe()
@@ -142,6 +151,8 @@ const cssZenTaoBug = [
     method: "title"
   },
 ]
+// selector：用于定位页面元素的 CSS 选择器字符串。 	定位「IAM 账号输入框」的 CSS 选择器（通过元素 ID 定位）
+// method：用于获取元素数据的属性（此处均为 value，因为目标元素是输入框，需获取其输入值）。
 const cssHuaWeiLogin = [
   {
     selector: '#IAMAccountInputId',
@@ -155,6 +166,18 @@ const cssHuaWeiLogin = [
     method: "value"
   }
 ]
+
+const cssJenkinsLogin = [
+  {
+    selector: '#j_username',
+    method: "value"
+  },
+  {
+    selector: 'input[name="j_password"][type="password"]',
+    method: "value"
+  },
+]
+
 
 const cssDasLogin = [
   {
@@ -179,26 +202,40 @@ export async function timerFunction() {
     }
     chrome.storage.sync.set({ [MyStorageKey.elementValues]: JSON.stringify(cssSelector) })
     chrome.runtime.sendMessage({ action: MyAction.finished });
-  } else if (ifZetTaoLogin) {
+  } 
+  
+  else if (ifZetTaoLogin) {
     ifZetTaoLogin = false;
     await getElementValues(cssZenTaoLogin, MyStorageKey.ZenTaoLogin)
 
 
-  } else if (ifZenTaoBug) {
+  } 
+  
+  else if (ifZenTaoBug) {
     ifZenTaoBug = false;
     let iframe = await waitForElementToDisplay("#appIframe-qa")
     var iframeDocument = iframe.contentDocument;
     await getElementValues(cssZenTaoBug, MyStorageKey.ZenTaoBug, iframeDocument)
 
-  } else if (ifZenTaoSearch) {
+  } 
+  else if (ifZenTaoSearch) {
     ifZenTaoSearch = false;
     let iframe = await waitForElementToDisplay("#appIframe-qa")
     var iframeDocument = iframe.contentDocument;
     await getZenTaoSearchElementValues(MyStorageKey.ZenTaoSearch, iframeDocument)
-  } else if (ifHuaWeiLogin){
+  } 
+  // 分别使用 cssHuaWeiLogin/cssDasLogin 选择器配置，抓取后存入 HuaWeiLogin/DasLogin 存储键，完成登录信息的自动化采集。
+  else if (ifHuaWeiLogin){
     ifHuaWeiLogin=false;
     await getElementValues(cssHuaWeiLogin, MyStorageKey.HuaWeiLogin)
-  } else if (ifDasLogin){
+  } 
+  
+  else if (ifJenkinsLogin) {
+    ifJenkinsLogin=false;
+    await getElementValues(cssJenkinsLogin, MyStorageKey.JenkinsLogin)
+  }
+  
+  else if (ifDasLogin){
     ifDasLogin=false;
     await getElementValues(cssDasLogin, MyStorageKey.DasLogin)
   }
@@ -249,6 +286,7 @@ const zentaoLoginPath = "/zentao/user-login";
 const zentaoBugPath = "/zentao/bug-create";
 const zentaoSearchPath = "/zentao/bug-browse";
 const huaweiLoginPath="auth.huaweicloud.com/authui/login.html"
+const jenkinsLoginPath = "jxcicd.jxfkedu.com/login";
 const dasLoginPath ="das.juexiaotime.com/login/index.html"
 
 const jxWebUrl = ["devweb.zhanliujiang.com", "relweb.zhanliujiang.com", "devfkweb.juexiaotime.com", "relfkweb.juexiaotime.com", "dev.juexiaofashuo.com", "rel.juexiaofashuo.com"];
@@ -470,8 +508,27 @@ export const writeDataTopage = async () => {
               const button = await waitForElementToDisplay('#btn_submit');
               button.click();
           }
+  }
+  
+    else if (currentURL.includes(jenkinsLoginPath)){
+              let JenkinsLogin = await chrome.storage.sync.get(MyStorageKey.JenkinsLogin)
+              if ( !JenkinsLogin || Object.keys(JenkinsLogin).length == 0) {
+                return
+              }
+              JenkinsLogin = JSON.parse(JenkinsLogin[MyStorageKey.JenkinsLogin])
+              JenkinsLogin.forEach(async (e, index) => {
+                await writeThenFocus(e["selector"], e["value"]);
+              })
+              const button = await waitForElementToDisplay('input[name="Submit"][type="submit"]');
+              if(button){
+                button.click();
+              }
+              else{
+                console.log("未找到登录按钮")
+              }}
 
-  }else if(currentURL.includes(dasLoginPath)){
+
+  else if(currentURL.includes(dasLoginPath)){
               let DasLogin = await chrome.storage.sync.get(MyStorageKey.DasLogin)
               if ( !DasLogin || Object.keys(DasLogin).length == 0) {
                 return

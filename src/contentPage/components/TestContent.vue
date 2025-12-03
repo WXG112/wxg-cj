@@ -49,6 +49,11 @@ const options = [
     value: 'DasLogin',
     label: '神策登录',
   }
+  ,
+    {
+    value: 'JenkinsLogin',
+    label: 'Jenkins登录',
+  }
 ]
 const handleComfirm=()=>{
   chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {

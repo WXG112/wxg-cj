@@ -2,7 +2,7 @@
   <div style="width: 600px; height: 200px;" >
 
     <el-row>
-      <el-text type="warn">获取tapd、禅道提bug页面,禅道登录页面的数据，自动回填（每次刷新或加载页面时）</el-text>
+      <el-text type="warn">获取tapd、禅道提bug页面,禅道登录页面的数据，华为IAM登录，gitee登录，自动回填（每次刷新或加载页面时）</el-text>
     </el-row>
     <el-row>
       <el-button type="primary" @click="firstStep">1、抓取页面已填的内容，开启回填</el-button>
@@ -12,7 +12,7 @@
     </el-divider>
     <el-row>
       <el-col>
-        <el-checkbox v-model="checked" label="在浏览器打开自动打开测试平台、禅道（重启生效）" size="large" @change="handleChange" />
+        <el-checkbox v-model="checked" label="在浏览器打开时自动打开测试、禅道（重启生效）等平台" size="large" @change="handleChange" />
       </el-col>
       
     </el-row>
