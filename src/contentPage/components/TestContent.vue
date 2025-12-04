@@ -54,6 +54,11 @@ const options = [
     value: 'JenkinsLogin',
     label: 'Jenkins登录',
   }
+  ,
+    {
+    value: 'JxapiLogin',
+    label: 'JxapiLogin登录',
+  }
 ]
 const handleComfirm=()=>{
   chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {

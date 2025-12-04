@@ -14,6 +14,7 @@ let ifZenTaoSearch = false;
 let ifHuaWeiLogin=false;
 let ifJenkinsLogin=false;
 let ifDasLogin=false;
+let ifJxapiLogin = false;
 let env = "";
 let project = "";
 const currentURL = window.location.href;
@@ -45,6 +46,9 @@ export const auto_write =async (message, sender, sendResponse) :Promise<boolean>
     }
     else if (currentURL.includes(jenkinsLoginPath)){
       ifJenkinsLogin=true;
+    }
+    else if (currentURL.includes(jxapiLoginPath)){
+      ifJxapiLogin=true;
     }
     else if (currentURL.includes(dasLoginPath)){
 
@@ -178,6 +182,17 @@ const cssJenkinsLogin = [
   },
 ]
 
+const cssJxapiLogin = [
+    {
+    selector: '#email',
+    method: "value"
+  },
+  {
+    selector: '#password',
+    method: "value"
+  },
+]
+
 
 const cssDasLogin = [
   {
@@ -234,6 +249,10 @@ export async function timerFunction() {
     ifJenkinsLogin=false;
     await getElementValues(cssJenkinsLogin, MyStorageKey.JenkinsLogin)
   }
+  else if (ifJxapiLogin) {
+    ifJxapiLogin=false;
+    await getElementValues(cssJxapiLogin, MyStorageKey.JxapiLogin)
+  }
   
   else if (ifDasLogin){
     ifDasLogin=false;
@@ -287,6 +306,7 @@ const zentaoBugPath = "/zentao/bug-create";
 const zentaoSearchPath = "/zentao/bug-browse";
 const huaweiLoginPath="auth.huaweicloud.com/authui/login.html"
 const jenkinsLoginPath = "jxcicd.jxfkedu.com/login";
+const jxapiLoginPath = "jx-api-doc.jxfkedu.com/login";
 const dasLoginPath ="das.juexiaotime.com/login/index.html"
 
 const jxWebUrl = ["devweb.zhanliujiang.com", "relweb.zhanliujiang.com", "devfkweb.juexiaotime.com", "relfkweb.juexiaotime.com", "dev.juexiaofashuo.com", "rel.juexiaofashuo.com"];
@@ -362,7 +382,8 @@ let zentaoiframeqa = null;
     value = ZenTaoBug[6]['value']
     await firstInputWrite('div[id="task_chosen"] input', value, `li[title*="${value}"]`, false, iframeDocument)
 
-  } else if (iframeUrl.includes(zentaoSearchPath)) {
+  } 
+  else if (iframeUrl.includes(zentaoSearchPath)) {
 
     let ZenTaoSearch = await chrome.storage.sync.get(MyStorageKey.ZenTaoSearch)
   
@@ -510,7 +531,7 @@ export const writeDataTopage = async () => {
           }
   }
   
-    else if (currentURL.includes(jenkinsLoginPath)){
+  else if (currentURL.includes(jenkinsLoginPath)){
               let JenkinsLogin = await chrome.storage.sync.get(MyStorageKey.JenkinsLogin)
               if ( !JenkinsLogin || Object.keys(JenkinsLogin).length == 0) {
                 return
@@ -520,6 +541,22 @@ export const writeDataTopage = async () => {
                 await writeThenFocus(e["selector"], e["value"]);
               })
               const button = await waitForElementToDisplay('input[name="Submit"][type="submit"]');
+              if(button){
+                button.click();
+              }
+              else{
+                console.log("未找到登录按钮")
+              }}
+  else if (currentURL.includes(jxapiLoginPath)){
+              let JxapiLogin = await chrome.storage.sync.get(MyStorageKey.JxapiLogin)
+              if ( !JxapiLogin || Object.keys(JxapiLogin).length == 0) {
+                return
+              }
+              JxapiLogin = JSON.parse(JxapiLogin[MyStorageKey.JxapiLogin])
+              JxapiLogin.forEach(async (e, index) => {
+                await writeThenFocus(e["selector"], e["value"]);
+              })
+              const button = await waitForElementToDisplay('button[type="submit"][class="ant-btn login-form-button ant-btn-primary"]>span');
               if(button){
                 button.click();
               }

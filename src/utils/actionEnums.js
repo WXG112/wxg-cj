@@ -17,6 +17,7 @@ export const  MyStorageKey = {
   ZenTaoLogin:"ZenTaoLogin",
   HuaWeiLogin:"HuaWeiLogin",
   JenkinsLogin:"JenkinsLogin",
+  JxapiLogin:"JxapiLogin",
   DasLogin:"DasLogin"
 }
 
