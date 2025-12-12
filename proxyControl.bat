@@ -17,8 +17,6 @@ if '%errorlevel%' NEQ '0' (
     pushd "%CD%"
     CD /D "%~dp0"
 
-:: 避免编码问题，暂时不切换代码页（移除chcp 65001）
-
 :: 参数定义
 set "action=%1"
 set "proxyHost=%2"
@@ -40,42 +38,40 @@ if "%action%"=="enable" (
         echo 错误：开启代理必须指定端口！
         goto ShowUsage
     )
-    :: 注册表操作（添加错误判断）
-    reg add "%regPath%" /v ProxyEnable /t REG_DWORD /d 1 /f
-    if %errorlevel% neq 0 (
-        reg add "%regPath%" /v ProxyServer /t REG_SZ /d "%proxyHost%:%proxyPort%" /f
-        if %errorlevel% neq 0 (
-            reg add "%regPath%" /v ProxyOverride /t REG_SZ /d "localhost;127.0.0.1;*.local" /f
+    :: 注册表操作
+    reg add "%regPath%" /v ProxyEnable /t REG_DWORD /d 1 /f >nul 2>&1
+    if %errorlevel% equ 0 (
+        reg add "%regPath%" /v ProxyServer /t REG_SZ /d "%proxyHost%:%proxyPort%" /f >nul 2>&1
+        if %errorlevel% equ 0 (
+            reg add "%regPath%" /v ProxyOverride /t REG_SZ /d "localhost;127.0.0.1;*.local" /f >nul 2>&1
             echo 系统代理已开启！
             echo 代理IP：%proxyHost% 端口：%proxyPort%
-        ) else ( echo 错误：设置代理服务器失败 )
-    ) else ( echo 错误：开启代理失败 )
+            exit /b 0
+        ) else ( 
+            echo 错误：设置代理服务器失败
+            exit /b 1
+        )
+    ) else ( 
+        echo 错误：开启代理失败
+        exit /b 1
+    )
 ) else if "%action%"=="disable" (
-    reg add "%regPath%" /v ProxyEnable /t REG_DWORD /d 0 /f
+    reg add "%regPath%" /v ProxyEnable /t REG_DWORD /d 0 /f >nul 2>&1
     if %errorlevel% equ 0 (
         echo 系统代理已关闭！
+        exit /b 0
     ) else (
         echo 错误：关闭代理失败
+        exit /b 1
     )
 ) else (
     echo 错误：无效的操作类型 "%action%"！
     goto ShowUsage
 )
 
-:: 刷新网络（保留输出以便排查）
-echo 刷新网络配置...
-netsh winhttp reset proxy
-ipconfig /flushdns
-
-echo.
-echo 操作完成，请检查代理设置。
-pause  :: 强制停留，显示结果
-exit /b 0
-
 :ShowUsage
 echo 用法：
 echo proxyControl.bat enable [代理IP] [端口]
 echo proxyControl.bat disable
 echo 示例：proxyControl.bat enable 127.0.0.1 8080
-pause
 exit /b 1
