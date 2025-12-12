@@ -57,7 +57,7 @@ const options = [
   ,
     {
     value: 'JxapiLogin',
-    label: 'JxapiLogin登录',
+    label: 'Jxapi登录',
   }
 ]
 const handleComfirm=()=>{

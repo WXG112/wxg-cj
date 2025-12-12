@@ -19,10 +19,12 @@
     "service_worker": "background/service-worker.js"
   },
   "permissions": [
+    "proxy",
     "activeTab",
     "tabs",
     "alarms",
-    "storage"
+    "storage",
+    "nativeMessaging" 
   ],
   "host_permissions": [],
   "content_scripts": [

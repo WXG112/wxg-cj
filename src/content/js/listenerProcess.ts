@@ -122,10 +122,7 @@ const cssZenTaoLogin = [
 ]
 
 const cssZenTaoBug = [
-  // {
-  //   selector: 'div[id="module_chosen"] span',
-  //   method: "title"
-  // },
+
   {
     selector: 'div[id="project_chosen"] span',
     method: "title"
