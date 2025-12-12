@@ -5,7 +5,10 @@ export const  MyAction= {
    cancelFrame:"cancelFrame",
    fetchInfo:"fetchInfo",
    showDialog:"showDialog",
-   finished:"finished"
+   finished:"finished",
+   enableProxy: "enableProxy",    // 新增：开启代理
+  disableProxy: "disableProxy",  // 新增：关闭代理
+  proxyStatus: "proxyStatus"     // 新增：代理状态回调
 }
 // 本地存储键名枚举
 export const  MyStorageKey = {
@@ -18,7 +21,8 @@ export const  MyStorageKey = {
   HuaWeiLogin:"HuaWeiLogin",
   JenkinsLogin:"JenkinsLogin",
   JxapiLogin:"JxapiLogin",
-  DasLogin:"DasLogin"
+  DasLogin:"DasLogin",
+  proxyConfig: "proxyConfig"     // 新增：存储代理IP和端口
 }
 
 

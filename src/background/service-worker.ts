@@ -58,3 +58,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 });
+
+
+// 在 popup 或 background 中添加测试代码
+const port = chrome.runtime.connectNative('com.example.proxycontrol');
+port.onDisconnect.addListener(() => {
+  console.error('连接失败原因：', chrome.runtime.lastError);
+});
+
+

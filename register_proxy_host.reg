@@ -1,0 +1,6 @@
+Windows Registry Editor Version 5.00
+
+; 1. 创建注册表项
+[HKEY_CURRENT_USER\Software\Google\Chrome\NativeMessagingHosts\com.example.proxycontrol]
+; 2. 给「默认值」赋值（关键：@ 代表默认值，路径用双反斜杠 \\ 转义）
+@="C:\\Users\\afei\\AppData\\Local\\Google\\Chrome\\NativeMessagingHosts\\com.example.proxycontrol.json"

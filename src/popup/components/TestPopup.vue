@@ -1,6 +1,5 @@
 <template>
-  <div style="width: 600px; height: 200px;" >
-
+  <div style="width: 600px; height: 200px;">
     <el-row>
       <el-text type="warn">获取tapd、禅道提bug页面,禅道登录页面的数据，华为IAM登录，api登录，jenkins登录等自动回填（每次刷新或加载页面时）</el-text>
     </el-row>
@@ -8,212 +7,175 @@
       <el-button type="primary" @click="firstStep">1、抓取页面已填的内容，开启回填</el-button>
       <el-button type="primary" @click="secondStep">2、结束回填</el-button>
     </el-row>
-    <el-divider>这是一条分割线
-    </el-divider>
+    <el-divider>这是一条分割线</el-divider>
     <el-row>
       <el-col>
         <el-checkbox v-model="checked" label="在浏览器打开时自动打开测试、禅道（重启生效）等平台" size="large" @change="handleChange" />
       </el-col>
-      
     </el-row>
     <el-row>
       <el-col>
         <el-checkbox v-model="checkedJxWeb" label="在觉晓web端打开用户信息面板" size="large" @change="handleChangeJxWeb" />
       </el-col>
     </el-row>
-        <el-divider>这是一条分割线
-    </el-divider>
-        <!-- 新增代理控制区域 -->
+
     <el-divider>系统代理控制</el-divider>
-    <el-row>
-      <el-switch 
-        v-model="proxyEnabled" 
-        active-text="代理已开启" 
-        inactive-text="代理已关闭"
-        @change="handleProxyChange"
-      />
-      <el-button 
-        type="primary" 
-        style="margin-left: 10px;"
-        @click="showProxyConfigDialog = true"
-        :disabled="!proxyEnabled"
-      >
-        配置代理
-      </el-button>
+    <el-row style="margin: 10px 0;">
+      <el-col :span="10">
+        <el-input v-model="proxyHost" placeholder="代理IP（如127.0.0.1）"></el-input>
+      </el-col>
+      <el-col :span="6">
+        <el-input v-model="proxyPort" placeholder="端口（如8080）"></el-input>
+      </el-col>
+      <el-col :span="4">
+        <el-button type="success" @click="enableProxy">开启代理</el-button>
+      </el-col>
+      <el-col :span="4">
+        <el-button type="danger" @click="disableProxy">关闭代理</el-button>
+      </el-col>
     </el-row>
-
-    <!-- 代理配置弹窗 -->
-    <el-dialog 
-      v-model="showProxyConfigDialog" 
-      title="设置系统代理" 
-      width="300px"
-    >
-      <el-form :model="proxyForm" label-width="80px">
-        <el-form-item label="IP地址">
-          <el-input v-model="proxyForm.host" placeholder="例如：127.0.0.1"></el-input>
-        </el-form-item>
-        <el-form-item label="端口号">
-          <el-input v-model="proxyForm.port" type="number" placeholder="例如：8080"></el-input>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showProxyConfigDialog = false">取消</el-button>
-        <el-button type="primary" @click="saveProxyConfig">确认保存</el-button>
-      </template>
-    </el-dialog>
-
+    <el-alert 
+      v-if="proxyMsg" 
+      :title="proxyMsg" 
+      :type="proxyStatus === 'success' ? 'success' : 'error'" 
+      show-icon
+    />
   </div>
- 
-
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { MyAction,MyStorageKey } from '@/utils/actionEnums.js';
+import { MyAction, MyStorageKey } from '@/utils/actionEnums.js';
 import { waitForElementToDisplay } from '@/utils/common.js'
 import { enableSystemProxy, disableSystemProxy, getProxyStatus } from '@/utils/systemProxyUtil.ts';
 
+// 原有功能变量
 const checked = ref(true)
-const checkedJxWeb=ref(true)
+const checkedJxWeb = ref(true)
 
-// 新增代理相关状态
-const proxyEnabled = ref(false);
-const showProxyConfigDialog = ref(false);
-const proxyForm = ref({
-  host: '',
-  port: 8080
-});
+// 代理控制变量（提前初始化，避免未定义访问）
+const proxyHost = ref<string>('127.0.0.1');
+const proxyPort = ref<string>('8080');
+const proxyMsg = ref<string>('');
+const proxyStatus = ref<string>('');
 
+// Native Messaging 通信核心函数（适配JSON格式，带错误处理）
+const sendProxyCommand = (action: string, host?: string, port?: string) => {
+  // 重置响应状态
+  proxyStatus.value = '';
+  proxyMsg.value = '';
+
+  try {
+    // 参数校验
+    if (action === 'enable' && (!host || !port)) {
+      proxyMsg.value = '代理IP和端口不能为空';
+      proxyStatus.value = 'error';
+      return;
+    }
+
+    // 构建标准JSON指令
+    const command = {
+      action: action,
+      proxyHost: host || '',
+      proxyPort: port || ''
+    };
+
+    // 连接Native Messaging主机
+    const nativePort = chrome.runtime.connectNative('com.example.proxycontrol');
+
+    // 监听返回消息
+    nativePort.onMessage.addListener((response: any) => {
+      proxyStatus.value = response.status || 'error';
+      proxyMsg.value = response.message || '未知响应';
+      // 开启代理成功时保存配置到本地
+      if (action === 'enable' && response.status === 'success') {
+        chrome.storage.sync.set({
+          [MyStorageKey.proxyConfig]: { host, port }
+        });
+      }
+    });
+
+    // 监听断开连接（捕获真实错误）
+    nativePort.onDisconnect.addListener(() => {
+      if (chrome.runtime.lastError) {
+        proxyStatus.value = 'error';
+        proxyMsg.value = `通信失败：${chrome.runtime.lastError.message}`;
+        console.error('Native Messaging断开原因：', chrome.runtime.lastError);
+      }
+    });
+
+    // 发送指令
+    nativePort.postMessage(command);
+
+  } catch (err: any) {
+    proxyStatus.value = 'error';
+    proxyMsg.value = `执行失败：${err.message || '未知错误'}`;
+    console.error('代理操作异常：', err);
+  }
+};
+
+// 开启代理（修复重复定义问题）
+const enableProxy = () => {
+  sendProxyCommand('enable', proxyHost.value, proxyPort.value);
+};
+
+// 关闭代理
+const disableProxy = () => {
+  sendProxyCommand('disable');
+};
+
+// 原有功能：开机启动URL设置
 const handleChange = async () => {
-  if (checked.value == true) {
-    await chrome.storage.sync.set({ [MyStorageKey.startUpUrl]: true })
-  } else {
-    await chrome.storage.sync.set({[MyStorageKey.startUpUrl]: false })
-  }
+  await chrome.storage.sync.set({ [MyStorageKey.startUpUrl]: checked.value });
+};
 
+// 原有功能：觉晓web用户信息面板设置
+const handleChangeJxWeb = async () => {
+  await chrome.storage.sync.set({ [MyStorageKey.JxWebUserInfo]: checkedJxWeb.value });
+};
 
-}
-
-const handleChangeJxWeb=async()=>{
-  if (checkedJxWeb.value == true) {
-    await chrome.storage.sync.set({ [MyStorageKey.JxWebUserInfo]: true })
-  } else {
-    await chrome.storage.sync.set({[MyStorageKey.JxWebUserInfo]: false })
-  }
-
-
-}
-
-
-
-
-
+// 原有功能：接收content script消息
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
-  // 接收来自 content script 的消息，并进行处理
   if (message.action === MyAction.finished) {
     alert("获取完成");
   }
 });
+
+// 原有功能：页面挂载初始化
 onMounted(async () => {
-
-  let startUpUrl = await chrome.storage.sync.get(MyStorageKey.startUpUrl)
-  let JxWebUserInfo=await chrome.storage.sync.get(MyStorageKey.JxWebUserInfo)
-
+  // 初始化开机启动配置
+  const startUpUrl = await chrome.storage.sync.get(MyStorageKey.startUpUrl);
+  const JxWebUserInfo = await chrome.storage.sync.get(MyStorageKey.JxWebUserInfo);
   
-  
-  if (startUpUrl.startUpUrl == undefined || startUpUrl.startUpUrl == true) {
-    checked.value = true
-  } else if (startUpUrl.startUpUrl == false) {
-    checked.value = false
+  checked.value = startUpUrl.startUpUrl !== false;
+  checkedJxWeb.value = JxWebUserInfo.JxWebUserInfo !== false;
+
+  // 初始化代理配置
+  const savedProxy = await chrome.storage.sync.get(MyStorageKey.proxyConfig);
+  if (savedProxy.proxyConfig) {
+    proxyHost.value = savedProxy.proxyConfig.host;
+    proxyPort.value = savedProxy.proxyConfig.port;
   }
+});
 
-  if (JxWebUserInfo.JxWebUserInfo == undefined || JxWebUserInfo.JxWebUserInfo == true) {
-    checkedJxWeb.value = true
-  } else if (JxWebUserInfo.JxWebUserInfo == false) {
-    checkedJxWeb.value = false
-  }
-
-    // 代理状态初始化
-  proxyEnabled.value = await getProxyStatus();
-  const storedProxy = await chrome.storage.sync.get("systemProxy");
-  if (storedProxy.systemProxy) {
-    proxyForm.value = storedProxy.systemProxy;
-  }
-
-})
-
-
+// 原有功能：1、抓取页面内容开启回填
 const firstStep = () => {
   chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-    chrome.tabs.sendMessage(tabs[0].id, { action:MyAction.fetchInfo }, async function  (response: any) {
-      // 回调函数，把传回的信息渲染在popup.html上
-      // console.log("auto_write_start")
-      
-    })
-  })
-}
+    chrome.tabs.sendMessage(tabs[0].id, { action: MyAction.fetchInfo }, async function (response: any) {
+      // 原有逻辑保留
+    });
+  });
+};
+
+// 原有功能：2、结束回填
 const secondStep = () => {
   chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
     chrome.tabs.sendMessage(tabs[0].id, { action: MyAction.showDialog }, function (response: any) {
-      // 回调函数，把传回的信息渲染在popup.html上
-      // console.log("auto_write_start")
-    })
-  })
-  window.close();}
-
-
-
-// 新增代理控制方法
-const handleProxyChange = async (enabled: boolean) => {
-  if (enabled) {
-    if (!proxyForm.value.host || !proxyForm.value.port) {
-      showProxyConfigDialog.value = true;
-      proxyEnabled.value = false;
-      return;
-    }
-    try {
-      await enableSystemProxy(proxyForm.value);
-      alert("系统代理已开启");
-    } catch (err) {
-      alert((err as Error).message);
-      proxyEnabled.value = false;
-    }
-  } else {
-    try {
-      await disableSystemProxy();
-      alert("系统代理已关闭");
-    } catch (err) {
-      alert((err as Error).message);
-      proxyEnabled.value = true;
-    }
-  }
+      // 原有逻辑保留
+    });
+  });
+  window.close();
 };
-
-const saveProxyConfig = async () => {
-  if (!proxyForm.value.host || !proxyForm.value.port) {
-    alert("请填写IP和端口");
-    return;
-  }
-  if (proxyEnabled.value) {
-    try {
-      await enableSystemProxy(proxyForm.value);
-      alert("代理配置已更新");
-    } catch (err) {
-      alert((err as Error).message);
-      return;
-    }
-  }
-  showProxyConfigDialog.value = false;
-};
-
-
-
-
-
-
-
-
-
 </script>
 
 <style scoped lang='scss'>
@@ -224,5 +186,4 @@ const saveProxyConfig = async () => {
 .el-row {
   margin-bottom: 10px;
 }
-
 </style>

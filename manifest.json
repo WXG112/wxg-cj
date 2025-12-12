@@ -20,11 +20,11 @@
   },
   "permissions": [
     "proxy",
+    "nativeMessaging",
     "activeTab",
     "tabs",
     "alarms",
-    "storage",
-    "nativeMessaging" 
+    "storage"
   ],
   "host_permissions": [
     "native-messaging://com.example.proxycontrol"
