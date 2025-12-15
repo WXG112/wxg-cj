@@ -2,130 +2,77 @@
 chcp 65001 >nul 2>&1
 setlocal enabledelayedexpansion
 
-:: 自动提权逻辑（兼容所有Windows版本）
+:: 日志路径
+set "logFile=C:\Users\afei\Desktop\proxy_debug.log"
+echo [%date% %time%] 模板BAT启动 >> !logFile!
+
+:: 强制提权（必须）
 openfiles >nul 2>&1
-if %errorlevel% equ 0 (
-    goto gotAdmin
-) else (
+if %errorlevel% neq 0 (
     echo Set UAC = CreateObject^("Shell.Application"^) > "%temp%\getadmin.vbs"
-    echo UAC.ShellExecute "%~s0", "%*", "", "runas", 0 >> "%temp%\getadmin.vbs"
+    echo UAC.ShellExecute "%~s0", "", "", "runas", 0 >> "%temp%\getadmin.vbs"
     "%temp%\getadmin.vbs"
     del /f /q "%temp%\getadmin.vbs" >nul 2>&1
     exit /B
 )
 
-:gotAdmin
-:: 参数初始化
-set "action="
-set "proxyHost="
-set "proxyPort="
-:: 同时兼容32/64位系统的注册表路径
-set "regPath=HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings"
-set "regPath64=HKLM\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Internet Settings"
+:: 核心：从环境变量读取参数（插件中设置的PROCESS级变量）
+set "action=!PROXY_ACTION!"
+set "proxyHost=!PROXY_HOST!"
+set "proxyPort=!PROXY_PORT!"
 
-:: 优先读取命令行参数
-if not "%~1"=="" (
-    set "action=%~1"
-    set "proxyHost=%~2"
-    set "proxyPort=%~3"
-) else (
-    :: 读取Native Messaging JSON输入
-    set "input="
-    for /f "delims=" %%i in ('more') do set "input=%%i"
-    
-    :: 解析enable指令
-    echo !input! | findstr /i /c:"action\":\"enable\"" >nul
-    if !errorlevel! equ 0 (
-        set "action=enable"
-        for /f "tokens=2 delims=:" %%a in ('echo !input! ^| findstr /i /c:"proxyHost\""') do (
-            set "temp=%%a"
-            set "proxyHost=!temp:~2,-1!"
-        )
-        for /f "tokens=2 delims=:" %%a in ('echo !input! ^| findstr /i /c:"proxyPort\""') do (
-            set "temp=%%a"
-            set "proxyPort=!temp:~2,-1!"
-        )
-    )
-    
-    :: 解析disable指令
-    echo !input! | findstr /i /c:"action\":\"disable\"" >nul
-    if !errorlevel! equ 0 (
-        set "action=disable"
-    )
-)
+:: 记录参数到日志
+echo [%date% %time%] 从环境变量接收参数：action=!action! host=!proxyHost! port=!proxyPort! >> !logFile!
 
-:: 参数校验
-if "!action!"=="" (
-    echo {"status":"error","message":"未指定操作类型（enable/disable）！"}
-    goto ShowUsage
-)
-
-:: ========== 核心修复：开启代理（注册表+netsh双保障） ==========
+:: ===================== 处理开启代理 =====================
 if /i "!action!"=="enable" (
+    :: 参数校验
     if "!proxyHost!"=="" (
-        echo {"status":"error","message":"开启代理必须指定IP！"}
-        goto ShowUsage
+        echo {"status":"error","message":"代理IP不能为空！"}
+        echo [%date% %time%] 错误：代理IP为空 >> !logFile!
+        exit /B 1
     )
     if "!proxyPort!"=="" (
-        echo {"status":"error","message":"开启代理必须指定端口！"}
-        goto ShowUsage
+        echo {"status":"error","message":"代理端口不能为空！"}
+        echo [%date% %time%] 错误：代理端口为空 >> !logFile!
+        exit /B 1
     )
-    
-    :: 1. 修改用户级注册表（优先）
-    reg add "!regPath!" /v ProxyEnable /t REG_DWORD /d 1 /f >nul 2>&1
-    reg add "!regPath!" /v ProxyServer /t REG_SZ /d "!proxyHost!:!proxyPort!" /f >nul 2>&1
-    reg add "!regPath!" /v ProxyOverride /t REG_SZ /d "localhost;127.0.0.1;*.local" /f >nul 2>&1
-    
-    :: 2. 64位系统补充修改32位注册表
-    if exist "%SYSTEMROOT%\SysWOW64" (
-        reg add "!regPath64!" /v ProxyEnable /t REG_DWORD /d 1 /f >nul 2>&1
-        reg add "!regPath64!" /v ProxyServer /t REG_SZ /d "!proxyHost!:!proxyPort!" /f >nul 2>&1
-    )
-    
-    :: 3. 用netsh强制设置系统代理（关键：让修改实时生效）
-    netsh winhttp set proxy "!proxyHost!:!proxyPort!" "localhost;127.0.0.1;*.local" >nul 2>&1
-    
-    :: 4. 验证是否生效
-    reg query "!regPath!" /v ProxyEnable | findstr /i "0x1" >nul 2>&1
-    if !errorlevel! equ 0 (
-        echo {"status":"success","message":"系统代理已开启，IP：!proxyHost! 端口：!proxyPort!"}
-        exit /b 0
-    ) else (
-        echo {"status":"error","message":"注册表修改成功，但系统代理未生效（可能被组策略限制）"}
-        exit /b 1
-    )
-)
 
-:: ========== 核心修复：关闭代理（注册表+netsh双保障） ==========
-if /i "!action!"=="disable" (
     :: 1. 修改用户级注册表
-    reg add "!regPath!" /v ProxyEnable /t REG_DWORD /d 0 /f >nul 2>&1
-    
-    :: 2. 64位系统补充修改32位注册表
-    if exist "%SYSTEMROOT%\SysWOW64" (
-        reg add "!regPath64!" /v ProxyEnable /t REG_DWORD /d 0 /f >nul 2>&1
-    )
-    
-    :: 3. 用netsh重置系统代理
-    netsh winhttp reset proxy >nul 2>&1
-    
-    :: 4. 验证是否生效
-    reg query "!regPath!" /v ProxyEnable | findstr /i "0x0" >nul 2>&1
-    if !errorlevel! equ 0 (
-        echo {"status":"success","message":"系统代理已关闭"}
-        exit /b 0
-    ) else (
-        echo {"status":"error","message":"注册表修改成功，但系统代理未关闭（可能被组策略限制）"}
-        exit /b 1
-    )
+    reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyEnable /t REG_DWORD /d 1 /f >> !logFile! 2>&1
+    reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyServer /t REG_SZ /d "!proxyHost!:!proxyPort!" /f >> !logFile! 2>&1
+    echo [%date% %time%] 注册表修改完成：!proxyHost!:!proxyPort! >> !logFile!
+
+    :: 2. 强制刷新系统代理
+    powershell -Command "$signature = '[DllImport(\\"user32.dll\\")] public static extern bool SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);'; $user32 = Add-Type -MemberDefinition $signature -Name User32 -Namespace Win32 -PassThru; $hwnd = [IntPtr]0xFFFF; $msg = 0x001A; $result = [UIntPtr]::Zero; $user32::SendMessageTimeout($hwnd, $msg, [UIntPtr]::Zero, 'Internet Settings', 0x0002, 1000, [ref]$result);" >> !logFile! 2>&1
+
+    :: 3. 验证结果
+    reg query "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyEnable >> !logFile! 2>&1
+    reg query "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyServer >> !logFile! 2>&1
+
+    echo [%date% %time%] 代理开启成功 >> !logFile!
+    echo {"status":"success","message":"系统代理已开启：!proxyHost!:!proxyPort!"}
+    exit /B 0
 )
 
-:: 无效操作类型
-echo {"status":"error","message":"无效的操作类型：!action!"}
-goto ShowUsage
+:: ===================== 处理关闭代理 =====================
+if /i "!action!"=="disable" (
+    :: 1. 关闭注册表代理开关
+    reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyEnable /t REG_DWORD /d 0 /f >> !logFile! 2>&1
+    echo [%date% %time%] 注册表代理开关关闭 >> !logFile!
 
-:ShowUsage
-echo {"status":"error","message":"用法：proxyControl.bat enable [代理IP] [端口] 或 proxyControl.bat disable"}
-exit /b 1
+    :: 2. 强制刷新系统代理
+    powershell -Command "$signature = '[DllImport(\\"user32.dll\\")] public static extern bool SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);'; $user32 = Add-Type -MemberDefinition $signature -Name User32 -Namespace Win32 -PassThru; $hwnd = [IntPtr]0xFFFF; $msg = 0x001A; $result = [UIntPtr]::Zero; $user32::SendMessageTimeout($hwnd, $msg, [UIntPtr]::Zero, 'Internet Settings', 0x0002, 1000, [ref]$result);" >> !logFile! 2>&1
+
+    echo [%date% %time%] 代理关闭成功 >> !logFile!
+    echo {"status":"success","message":"系统代理已关闭"}
+    exit /B 0
+)
+
+:: ===================== 无效参数处理 =====================
+echo {"status":"error","message":"无效操作类型：!action!"}
+echo [%date% %time%] 错误：无效操作类型 !action! >> !logFile!
+exit /B 1
 
 endlocal
+exit /B 0

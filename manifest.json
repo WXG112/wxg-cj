@@ -29,6 +29,9 @@
     "webRequest",
     "webRequestBlocking"
   ],
+    "externally_connectable": {
+    "matches": ["chrome-extension://pjdbiiomdlfikljmogbnjcpmpfpmbngi/"]
+  },
   "host_permissions": [
      "<all_urls>" 
   ],

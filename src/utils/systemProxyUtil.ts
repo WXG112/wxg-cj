@@ -1,4 +1,3 @@
-// src/utils/systemProxyUtil.ts
 interface ProxyConfig {
   host: string;
   port: number;
@@ -14,7 +13,7 @@ export const enableSystemProxy = async (config: ProxyConfig) => {
       },
       (response) => {
         if (response?.success) {
-          alert("系统代理开启成功");
+          alert(`系统代理开启成功：${config.host}:${config.port}`);
           resolve(true);
         } else {
           reject(new Error(`开启失败: ${response?.error || "未知错误"}`));
