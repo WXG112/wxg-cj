@@ -17,11 +17,3 @@ chrome.runtime.onStartup.addListener(async function() {
     }
 });
 
-// 仅保留原有消息处理
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === MyAction.finished) {
-    alert("获取完成");
-    sendResponse({ status: "success" });
-  }
-  return true;
-});

@@ -18,6 +18,5 @@ export const MyStorageKey = {
   HuaWeiLogin:"HuaWeiLogin",
   JenkinsLogin:"JenkinsLogin",
   JxapiLogin:"JxapiLogin",
-  DasLogin:"DasLogin",
-  proxyConfig: "proxyConfig"
+
 }
